@@ -30,7 +30,6 @@ type Message struct {
 
 func (c *Client) readWS() {
 	defer func() {
-		log.Println("ReadWS closed")
 		c.Hub.Unregister <- c
 		c.Con.Close()
 	}()
@@ -45,7 +44,6 @@ func (c *Client) readWS() {
 
 	for {
 		_, byteMsg, err := c.Con.ReadMessage()
-
 		log.Println("Accepted a message")
 
 		if err != nil {
@@ -56,7 +54,6 @@ func (c *Client) readWS() {
 		}
 
 		var msg Message
-
 		err = json.Unmarshal(byteMsg, &msg)
 		if err != nil {
 			log.Printf("error %v\n", err.Error())
@@ -67,9 +64,6 @@ func (c *Client) readWS() {
 			log.Printf("error %v\n", "validation")
 			break
 		}
-
-		log.Println(msg)
-
 		c.Hub.Broadcast <- msg
 	}
 }
@@ -78,8 +72,7 @@ func (c *Client) writeWS() {
 	ticker := time.NewTicker(pingPeriod)
 
 	defer func() {
-		log.Println("WriteWS closed")
-		c.Hub.Unregister <- c
+		ticker.Stop()
 		c.Con.Close()
 	}()
 
@@ -88,7 +81,6 @@ func (c *Client) writeWS() {
 		case msg, ok := <-c.Send:
 			c.Con.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				log.Println("Send chan is closed")
 				c.Con.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -113,7 +105,6 @@ func (c *Client) writeWS() {
 			}
 		case <-ticker.C:
 			c.Con.SetWriteDeadline(time.Now().Add(writeWait))
-			log.Println("Sending ping msg")
 			if err := c.Con.WriteMessage(websocket.PingMessage, nil); err != nil {
 				log.Println(err.Error())
 				return
