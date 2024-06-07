@@ -2,54 +2,52 @@ package ws
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/websocket"
 )
 
-// TODO accept message
-
-// TODO send message
-
 var upgrader = websocket.Upgrader{
-	// Reuse buffers that allocates standart library http server
+	// Reuse buffers that allocates standard library http server
 	ReadBufferSize:  0,
 	WriteBufferSize: 0,
 }
 
-func Upgrade(hub *Hub, w http.ResponseWriter, r *http.Request) {
-	log.Println("Handled WS")
+func Upgrade(h *Hub, w http.ResponseWriter, r *http.Request) {
+	logger := h.Logger.With(slog.String("op", "ws.Upgrade"))
 
-	userIDstr := r.URL.Query().Get("id")
+	logger.Debug("Handled WS")
+
+	userIDstr := r.URL.Query().Get("id") // or any data to auth a client
 	if userIDstr == "" {
 		http.Error(w, fmt.Errorf("no id in query").Error(), http.StatusBadRequest)
-		fmt.Printf("error: %s\n", "No id in query")
+		logger.Error("error: %s\n", "No id in query")
 		return
 	}
 
 	userID, err := strconv.ParseUint(userIDstr, 10, 64)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		fmt.Println(err.Error())
+		logger.Error(err.Error())
 		return
 	}
 
 	//
-	// You can use JWT here or something and parse ID from it
-	// Current ws server does not use auth
+	// MOCK VALIDATION
 	//
-
-	fmt.Printf("User ID on upgrade %v\n", userID)
+	if false {
+		http.Error(w, fmt.Errorf("unauthorized").Error(), http.StatusUnauthorized)
+	}
 
 	con, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error(err.Error())
 		return
 	}
 
-	client := &Client{ID: userID, Hub: hub, Con: con, Send: make(chan Message, 256)}
+	client := &Client{ID: userID, Hub: h, Con: con, Send: make(chan Message, 256)}
 	client.Hub.Register <- client
 
 	go client.readWS()
