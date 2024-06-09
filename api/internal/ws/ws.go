@@ -1,12 +1,9 @@
 package ws
 
 import (
-	"fmt"
+	"github.com/gorilla/websocket"
 	"log/slog"
 	"net/http"
-	"strconv"
-
-	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
@@ -15,31 +12,32 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 0,
 }
 
+const UserContextKey = "user"
+
 func Upgrade(h *Hub, w http.ResponseWriter, r *http.Request) {
 	logger := h.Logger.With(slog.String("op", "ws.Upgrade"))
 
 	logger.Debug("Handled WS")
 
-	userIDstr := r.URL.Query().Get("id") // or any data to auth a client
-	if userIDstr == "" {
-		http.Error(w, fmt.Errorf("no id in query").Error(), http.StatusBadRequest)
-		logger.Error("error: %s\n", "No id in query")
-		return
-	}
-
-	userID, err := strconv.ParseUint(userIDstr, 10, 64)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		logger.Error(err.Error())
-		return
-	}
-
+	//userIDstr := r.URL.Query().Get("id") // or any data to auth a client
+	//if userIDstr == "" {
+	//	http.Error(w, fmt.Errorf("no id in query").Error(), http.StatusBadRequest)
+	//	logger.Error("error: %s\n", "No id in query")
+	//	return
+	//}
 	//
-	// MOCK VALIDATION
+	//userID, err := strconv.ParseUint(userIDstr, 10, 64)
+	//if err != nil {
+	//	http.Error(w, err.Error(), http.StatusBadRequest)
+	//	logger.Error(err.Error())
+	//	return
+	//}
 	//
-	if false {
-		http.Error(w, fmt.Errorf("unauthorized").Error(), http.StatusUnauthorized)
-	}
+	//if false {
+	//	http.Error(w, fmt.Errorf("unauthorized").Error(), http.StatusUnauthorized)
+	//}
+
+	userID := r.Context().Value(UserContextKey).(uint64)
 
 	con, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

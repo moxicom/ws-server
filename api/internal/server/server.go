@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/moxicom/ws-server/internal/auth"
 	"github.com/moxicom/ws-server/internal/ws"
 	"log/slog"
 	"net/http"
@@ -29,9 +30,7 @@ func (s *Server) Run(addr string) {
 	hub := ws.NewHub(s.logger)
 	go hub.Run()
 
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		ws.Upgrade(hub, w, r)
-	})
+	http.HandleFunc("/ws", auth.AuthMiddleware(hub, ws.Upgrade))
 
 	server := &http.Server{
 		Addr:    addr,
