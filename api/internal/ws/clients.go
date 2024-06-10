@@ -1,8 +1,11 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -28,10 +31,40 @@ type Message struct {
 	Msg    string `json:"msg,omitempty"`
 }
 
-func (c *Client) readWS() {
+// BrokerBroadcast receive message from publisher
+func (c *Client) BrokerBroadcast(ctx context.Context, cancelCtx context.CancelFunc, userID uint64) {
+	pubsub := c.Hub.RedisStorage.Subscribe(ctx, brockerChanPrefix+strconv.FormatUint(userID, 10))
+
+	defer func() {
+		pubsub.Close()
+		c.Hub.Unregister <- &Client{ID: userID}
+		cancelCtx()
+		fmt.Println("brocker broadcast cancelled")
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case redisMsg, ok := <-pubsub.Channel():
+			if !ok {
+				return
+			}
+			var msg Message
+			if err := json.Unmarshal([]byte(redisMsg.Payload), &msg); err != nil {
+				c.Hub.Logger.Error("Failed to unmarshal message", "error", err)
+				continue
+			}
+			c.Hub.ToSub <- msg
+		}
+	}
+}
+
+func (c *Client) readWS(cancelCtx context.CancelFunc) {
 	defer func() {
 		c.Hub.Unregister <- c
 		c.Con.Close()
+		cancelCtx()
 	}()
 
 	logger := c.Hub.Logger.With(slog.String("op", "ws.Client.readWS"))
@@ -66,7 +99,9 @@ func (c *Client) readWS() {
 			logger.Error("error %v\n", "validation")
 			break
 		}
-		c.Hub.Broadcast <- msg
+
+		// Write to message broker
+		c.Hub.FromPub <- msg
 	}
 }
 

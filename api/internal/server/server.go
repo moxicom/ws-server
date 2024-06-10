@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
-	"github.com/moxicom/ws-server/internal/auth"
-	"github.com/moxicom/ws-server/internal/ws"
+	"github.com/moxicom/ws-server/api/internal/auth"
+	"github.com/moxicom/ws-server/api/internal/config"
+	"github.com/moxicom/ws-server/api/internal/storage/redis_storage"
+	"github.com/moxicom/ws-server/api/internal/ws"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,30 +17,39 @@ import (
 type Server struct {
 	Shutdown chan struct{}
 	logger   *slog.Logger
+	cfg      config.Config
 }
 
-func New(logger *slog.Logger) *Server {
+func New(logger *slog.Logger, cfg config.Config) *Server {
 	return &Server{
 		Shutdown: make(chan struct{}),
 		logger:   logger,
+		cfg:      cfg,
 	}
 }
 
-func (s *Server) Run(addr string) {
+func (s *Server) Run() {
 	logger := s.logger.With(slog.String("op", "server.Run"))
 
-	hub := ws.NewHub(s.logger)
+	// Connect to redis_storage
+	storageService := redis_storage.MustConnect(s.cfg.RedisAddr, s.cfg.RedisPass, s.cfg.RedisDB)
+
+	// Init hub
+	hub := ws.NewHub(s.logger, storageService)
 	go hub.Run()
+
+	// TODO: Connect to redis_storage
+	// rdb := connect_to_redis_mock
 
 	http.HandleFunc("/ws", auth.AuthMiddleware(hub, ws.Upgrade))
 
 	server := &http.Server{
-		Addr:    addr,
+		Addr:    s.cfg.ServerAddr,
 		Handler: nil,
 	}
 
 	go func() {
-		logger.Info("Server listening on " + addr)
+		logger.Info("Server listening on " + s.cfg.ServerAddr)
 		err := server.ListenAndServe()
 		if err != nil {
 			logger.Error(err.Error())

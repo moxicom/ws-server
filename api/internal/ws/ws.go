@@ -1,6 +1,8 @@
 package ws
 
 import (
+	"context"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"log/slog"
 	"net/http"
@@ -19,24 +21,6 @@ func Upgrade(h *Hub, w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("Handled WS")
 
-	//userIDstr := r.URL.Query().Get("id") // or any data to auth a client
-	//if userIDstr == "" {
-	//	http.Error(w, fmt.Errorf("no id in query").Error(), http.StatusBadRequest)
-	//	logger.Error("error: %s\n", "No id in query")
-	//	return
-	//}
-	//
-	//userID, err := strconv.ParseUint(userIDstr, 10, 64)
-	//if err != nil {
-	//	http.Error(w, err.Error(), http.StatusBadRequest)
-	//	logger.Error(err.Error())
-	//	return
-	//}
-	//
-	//if false {
-	//	http.Error(w, fmt.Errorf("unauthorized").Error(), http.StatusUnauthorized)
-	//}
-
 	userID := r.Context().Value(UserContextKey).(uint64)
 
 	con, err := upgrader.Upgrade(w, r, nil)
@@ -45,9 +29,13 @@ func Upgrade(h *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println(userID)
+
 	client := &Client{ID: userID, Hub: h, Con: con, Send: make(chan Message, 256)}
 	client.Hub.Register <- client
 
-	go client.readWS()
+	ctx, cancel := context.WithCancel(context.Background())
+	go client.readWS(cancel)
 	go client.writeWS()
+	go client.BrokerBroadcast(ctx, cancel, client.ID)
 }

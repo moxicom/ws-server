@@ -1,16 +1,26 @@
 package main
 
 import (
-	"github.com/moxicom/ws-server/internal/server"
+	"github.com/joho/godotenv"
+	"github.com/moxicom/ws-server/api/internal/config"
+	"github.com/moxicom/ws-server/api/internal/server"
+	"log"
 	"log/slog"
 	"os"
 )
 
 func main() {
+
+	if err := godotenv.Load(); err != nil {
+		log.Print("No .env file found")
+	}
+
 	log := setupLogger()
 
-	s := server.New(log)
-	s.Run(":8080")
+	config := config.NewConfig()
+
+	s := server.New(log, config)
+	s.Run()
 
 }
 

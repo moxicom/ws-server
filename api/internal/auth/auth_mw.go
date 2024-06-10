@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
-	"github.com/moxicom/ws-server/internal/ws"
+	"github.com/moxicom/ws-server/api/internal/ws"
 	"net/http"
 )
 
